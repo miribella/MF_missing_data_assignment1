@@ -1,0 +1,197 @@
+---
+title: "Exercise 4"
+author: "Miriam Fischer"
+date: "12 10 2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+We first load our data
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+load("C:/Users/Miriam/Box Sync/Masters/IncompleteDataAnalysis/Assignment1_MF/databp.Rdata")
+```
+
+## 4a: Complete case analysis
+
+We create a dataset only of complete observations
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+data_complete <- databp[complete.cases(databp),]
+```
+
+We calculate the mean and standard error of the complete data 
+For the standard error, we define a function calculating the error.
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+mean(data_complete$recovtime)
+
+#sterror = st deviation divided by squareroot of length of data
+sterror <- function(x) sd(x)/sqrt(length(x))
+sterror(data_complete$recovtime)
+```
+
+To calculate the pearson correlation, we need to first calculate the correlation matrix (excluding missing cases). We then divide the corresponding entry by the product of the two variables standard deviation. We note than when calculating their standard deviation, we must use only the entries included in our complete case analysis.
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covcc <- cov(databp, use = "complete") 
+```
+
+correlation between recovery and dose
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covcc["logdose","recovtime"]/(sd(data_complete$logdose)*sd(data_complete$recovtime))
+```
+
+correlation between time and bpressure
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covcc["bloodp","recovtime"]/(sd(data_complete$bloodp)*sd(data_complete$recovtime))
+```
+
+## 4b: Mean imputation
+We first observe that the time is the only variable with missing observations, we thus only need to perform imputation on this variable
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+mean_recov <- mean(databp$recovtime, na.rm = TRUE)
+recov_mi <- ifelse(is.na(databp$recovtime), mean_recov, databp$recovtime)
+```
+
+Mean and st error of recovtime with mean imputation
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+data_mi <- data.frame(logdose = databp$logdose, bloodp = databp$bloodp, recovtime = recov_mi)
+
+mean(data_mi$recovtime)
+
+sterror(data_mi$recovtime)
+```
+
+We again calculate the pearson correlation, this time on our new dataset with the missing values filled in with the mean (and we don't need to say we only want complete observations as the data is complete)
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covmi <- cov(data_mi) 
+```
+
+correlation between recovery and dose
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covmi["logdose","recovtime"]/(sd(data_mi$logdose)*sd(data_mi$recovtime))
+```
+
+correlation between time and bpressure
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covmi["bloodp","recovtime"]/(sd(data_mi$bloodp)*sd(data_mi$recovtime))
+```
+## 4c: Mean regression imputation
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+plot(databp$logdose, databp$recovtime)
+plot(databp$bloodp, databp$recovtime)
+```
+
+As we have seen a positive correlation between time and dose and a negative correlation between time and bpressure, we include both variables into our regression. Our regressionmodel is
+
+\[
+\textrm{Recovtime}_i = \beta_0 + \beta_1*\textrm{Logdose}_i + \beta_2*\textrm{Bloodpressure}_i + \varepsilon_i
+\]
+
+assuming \( \varepsilon_i \stackrel{iid}{\sim} N(0,\sigma^2)\). We expect \(\beta_1>0 \) and \(\beta_2<0\).
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+fit_mr <- lm(databp$recovtime ~ databp$logdose + databp$bloodp)
+fit_mr$coefficients
+```
+We create a new vector with the predicted times and include it to a new dataset with our new predicted values.
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+predicted_time <- predict(fit_mr, newdata = databp)
+recov_predict <- ifelse(is.na(databp$recovtime), predicted_time, databp$recovtime)
+data_mr <- data.frame(logdose = databp$logdose, bloodp = databp$bloodp, recovtime = recov_predict)
+```
+
+Mean and standard error of the predicted dataset
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+mean(data_mr$recovtime)
+
+sterror(data_mr$recovtime)
+```
+
+Calculating the correlation matrix 
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covmr <- cov(data_mr) 
+```
+
+correlation between recovery and dose
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covmr["logdose","recovtime"]/(sd(data_mr$logdose)*sd(data_mr$recovtime))
+```
+
+correlation between time and bpressure
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covmr["bloodp","recovtime"]/(sd(data_mr$bloodp)*sd(data_mr$recovtime))
+```
+## 4d: 
+
+We use the model of 3c and add a random number
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+set.seed(49)
+
+predicted_sri <- predict(fit_mr, newdata = databp) + rnorm(nrow(databp), 0, sigma(fit_mr))
+recov_sri <- ifelse(is.na(databp$recovtime), predicted_sri, databp$recovtime)
+```
+
+
+We calculate the mean and standard error
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+data_sri <- data.frame(logdose = databp$logdose, bloodp = databp$bloodp, recovtime = recov_sri)
+mean(data_sri$recovtime)
+sterror(data_sri$recovtime)
+```
+
+Calculating the correlation matrix 
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covsri <- cov(data_sri) 
+```
+
+correlation between recovery and dose
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covsri["logdose","recovtime"]/(sd(data_sri$logdose)*sd(data_sri$recovtime))
+```
+
+correlation between time and bpressure
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covsri["bloodp","recovtime"]/(sd(data_sri$bloodp)*sd(data_sri$recovtime))
+```
+
+As we include a random error term, we need to make sure that we don't predict negative times. Further, we might consider to limit the fractional part of the predicted values.
+
+## 4e: predictive mean
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+mis_index <- which(is.na(databp$recovtime))
+
+best_replace <- function(val){
+  
+  min <- .Machine$integer.max
+  ind <- -1
+  available_data <- which(is.na(databp$recovtime) == FALSE)
+  
+  for (i in available_data){
+    squaredis <- (val - databp$recovtime[i])**2
+    if (squaredis < min){
+      min <- squaredis
+      ind <- i
+    }
+  }
+  return (ind)
+}
+
+recov_prmtp <- 1:length(databp$recovtime)
+
+for (inde in mis_index){
+  best <- best_replace(predicted_sri[inde])
+  recov_prmtp[inde] <- databp$recovtime[best]
+  cat("For datapoint ", inde, " we take the value of ", best, "\n")
+}
+
+recov_prm <- ifelse(is.na(databp$recovtime), recov_prmtp, databp$recovtime)
+```
+
+## 4f: 
+
+One advantage of predictive mean matching is that we can be certain that our predicted values are values which comply with the pattern of the given variable. With that I mean that if our variable is time, and has only integer values, predictive mean matching will also only predict integer values (as it simply takes already given values). Stochastic regression imputation on the other side calculates the value with regression, and might predict non-integer values. However, predictive mean matching can have similar disadvantages than mean imputation: using already existing values makes the data less variable, leading to changes in the standard deviation of the data.
