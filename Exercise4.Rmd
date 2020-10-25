@@ -7,7 +7,7 @@ output:
   html_document: default
 ---
 
-We first load our data
+We load our data (please use your corresponding path)
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 load("C:/Users/Miriam/Box Sync/Masters/IncompleteDataAnalysis/Assignment1_MF/databp.Rdata")
 ```
@@ -79,18 +79,20 @@ covmi["bloodp","recovtime"]/(sd(data_mi$bloodp)*sd(data_mi$recovtime))
 ```
 ## 4c: Mean regression imputation
 
+We first plot the variables, to see if the assumption of a linear dependence used for our regression is accurate. Whereas I wouldn't be really confident saying there is a linear dependence, the plots give at least no evidence to say the dependence would be for example logarithmic or quadratic. So in my opinion, this data is more telling us there is no reason not to do linear regression, more than they say there is reason to do linear regression.
+
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 plot(databp$logdose, databp$recovtime)
 plot(databp$bloodp, databp$recovtime)
 ```
 
-As we have seen a positive correlation between time and dose and a negative correlation between time and bpressure, we include both variables into our regression. Our regressionmodel is
+We include both of our observed variables into our regression. Our regressionmodel is
 
 \[
 \textrm{Recovtime}_i = \beta_0 + \beta_1*\textrm{Logdose}_i + \beta_2*\textrm{Bloodpressure}_i + \varepsilon_i
 \]
 
-assuming \( \varepsilon_i \stackrel{iid}{\sim} N(0,\sigma^2)\). We expect \(\beta_1>0 \) and \(\beta_2<0\).
+assuming \( \varepsilon_i \stackrel{iid}{\sim} N(0,\sigma^2)\). We expect \(\beta_1>0 \) and \(\beta_2<0\). As we have seen a positive correlation between time and dose and a negative correlation between time and bpressure.
 
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 fit_mr <- lm(databp$recovtime ~ databp$logdose + databp$bloodp)
@@ -159,9 +161,29 @@ correlation between time and bpressure
 covsri["bloodp","recovtime"]/(sd(data_sri$bloodp)*sd(data_sri$recovtime))
 ```
 
-As we include a random error term, we need to make sure that we don't predict negative times. Further, we might consider to limit the fractional part of the predicted values.
+As we include a random error term, we need to make sure that we don't predict negative times. Further, we might consider to limit the fractional part of the predicted values, thus we might include a floor function to our predicted values, making them nonfractional. In that case, we would use
+
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+recov_sri_int <- ifelse(is.na(databp$recovtime), floor(predicted_sri), databp$recovtime)
+data_sri_int <- data.frame(logdose = databp$logdose, bloodp = databp$bloodp, recovtime = recov_sri_int)
+```
+
+giving us the following mean, standard error, correlation matrix:
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+mean(data_sri_int$recovtime)
+sterror(data_sri_int$recovtime)
+
+covsriint <- cov(data_sri_int) 
+covsriint["logdose","recovtime"]/(sd(data_sri_int$logdose)*sd(data_sri_int$recovtime))
+covsriint["bloodp","recovtime"]/(sd(data_sri_int$bloodp)*sd(data_sri_int$recovtime))
+```
+
+
 
 ## 4e: predictive mean
+
+We define a function which will calculate the index of the closest observed value to our prediction.
+
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 mis_index <- which(is.na(databp$recovtime))
 
@@ -186,12 +208,27 @@ recov_prmtp <- 1:length(databp$recovtime)
 for (inde in mis_index){
   best <- best_replace(predicted_sri[inde])
   recov_prmtp[inde] <- databp$recovtime[best]
-  cat("For datapoint ", inde, " we take the value of ", best, "\n")
+  cat("datapoint ", inde, " we take value ", databp$recovtime[best]," of index ", best, "\n")
 }
 
 recov_prm <- ifelse(is.na(databp$recovtime), recov_prmtp, databp$recovtime)
+data_prm <- data.frame(logdose = databp$logdose, bloodp = databp$bloodp, recovtime = recov_prm)
 ```
+
+We calculate the mean and st error
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+mean(data_sri_int$recovtime)
+sterror(data_sri_int$recovtime)
+```
+
+and the correlation
+```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
+covprm <- cov(data_prm) 
+covprm["logdose","recovtime"]/(sd(data_prm$logdose)*sd(data_prm$recovtime))
+covprm["bloodp","recovtime"]/(sd(data_prm$bloodp)*sd(data_prm$recovtime))
+```
+
 
 ## 4f: 
 
-One advantage of predictive mean matching is that we can be certain that our predicted values are values which comply with the pattern of the given variable. With that I mean that if our variable is time, and has only integer values, predictive mean matching will also only predict integer values (as it simply takes already given values). Stochastic regression imputation on the other side calculates the value with regression, and might predict non-integer values. However, predictive mean matching can have similar disadvantages than mean imputation: using already existing values makes the data less variable, leading to changes in the standard deviation of the data.
+One advantage of predictive mean matching is that we can be certain that our predicted values are values which comply with the pattern of the given variable. With that I mean that if our variable is time, and has only integer values, predictive mean matching will also only predict integer values (as it simply takes already given values). Stochastic regression imputation on the other side calculates the value with regression, and might predict non-integer values. However, predictive mean matching can have similar disadvantages to mean imputation: using already existing values as the values for missing data makes the overall data less variable (as we do not add new values to the dataset, but just have already existing data with higher frequency in the data afte the imputation), leading to changes in the standard deviation of the data.

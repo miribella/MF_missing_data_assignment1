@@ -44,7 +44,7 @@ Note that this is MAR, missing at random. The reason is that with a=2 and b=0, t
 \[
   2(Y_1-1) + Z_3<0
 \]
-This function clearly depends on Y1, but not on Y2. It also depends on a random variable Z3 (which is without connection to Y1 and Y2). Thus, missingness of Y2 depends on the value of Y1, making it MAR. However, it does not depend on Y2 itself. We further argue that the missingness depending on Z3 is not seen as missingness depending on another variable (of data which we do not have available), as this is solely random.
+This function clearly depends on Y1, but not on Y2. It also depends on a random variable Z3 (which is without connection to Y1 and Y2). We note that Y1 is fully observed. Thus, missingness of Y2 depends on the value of Y1, which we have available in our dataset, making it MAR. Most importantly, missingness does not depend on Y2 itself. We further argue that the missingness depending on Z3 is not seen as missingness depending on an un-observed variable (in which case we would have MNAR), as Z3 is solely random and thus the missingness conditioned on Z3 is random.
 
 ## 3a: Plots
 We now plot the missing data for 3a.
@@ -58,8 +58,11 @@ legend(1,0.4,legend = c("Complete data", "Observed data", "Missing data"),
        col = c("blue", "darkgreen", "red"), lty = c(1,1,1), lwd = c(2,2,2), bty="n")
 ```
 
+As we can see, the plots of the observed and missing data are not the same. However, they are shifted: if we ignore the fact that their respective mean and mode are at different values of Y2, the shape of the plot is similar. With that I mean that if we would shift the curve of the missing data to the right, we would roughly get the curve of the observed data. This is commonly seen for MAR data: Unconditioned on observed variables, missingness looks MNAR, but if we condition on observed variables, the missingness follows the same patterns.
 
 ## 3b: Regression imputation
+We perform linear regression and assume that the necessary requirements for linear regression are fulfilled. We want to estimate the effect of Y1 on Y2.
+
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 Y2_MAR_na <- ifelse(v<0, NA, Y2)
 data_b <- data.frame(Y1_reg_b = Y1, Y2_reg_b = Y2_MAR_na)
@@ -71,7 +74,7 @@ The regression is:
 reg_fit_b$coefficients
 ```
 
-Our predicted dataset will have the known values of Y2 for the values where we did not impose missingness, and will use the values predicted with our regression for the values which are missing.
+Our predicted dataset will have the known values of Y2 for the values where we did not impose missingness, and will use the values predicted with our regression for the values which are missing. Further, as we use stochastic imputation, we include a random noise.
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 predicted_b <- predict(reg_fit_b, newdata = data_b) + rnorm(nrow(data_b), 0, sigma(reg_fit_b))
 Y2_MAR_pre <- ifelse(is.na(data_b$Y2_reg_b), predicted_b, Y2)
@@ -139,9 +142,11 @@ legend(1,0.4,legend = c("Complete data", "Observed data", "Missing data"),
        col = c("blue", "darkgreen", "red"), lty = c(1,1,1), lwd = c(2,2,2), bty="n")
 ```
 
-
+Most importantly, the missing data and the observed data are very different to each other. This will prove to be different to predict the missing data later. 
 
 ## 3d: Regression imputation
+We again use linear regression and assume the underlying assumptions to be met.
+
 ```{r, include = TRUE, message = FALSE, tidy = TRUE, fig.align = 'center'}
 Y2_MNAR_na <- ifelse(vv<0, NA, Y2)
 data_d <- data.frame(Y1_reg_d = Y1, Y2_reg_d = Y2_MNAR_na)
@@ -183,4 +188,4 @@ legend(1,0.4,legend = c("Data (of missing data)", "Predicted data (of missing da
        col = c("blue", "darkgreen"), lty = c(1,1), lwd = c(2,2), bty="n")
 ```
 
-Particularly if we plot only the data of our missing data, we see that our prediction gives very poor results in predicting Y2. This is not a surprise: Our regression tries to predict Y2 based on Y1, but for our model, missingness on Y2 is not based on Y1, but on Y2! It is no surprise that the prediction is not good.
+Compared to the plots of the prediction for MAR, the predictions we are doing here are much worse: for MAR, our predictions were somewhat accurate (or at least reasonable), but the predictions we have here are far from being accurate. Thus, for MNAR, our prediction gives very poor results in predicting Y2. This is not a surprise: Our regression tries to predict Y2 based on Y1, but for our model, missingness on Y2 is not based on Y1, but on Y2. It is no surprise that the prediction is not good, as it tries to find a causality between two variables which do not have a causal connection to each other! More badly, for the regression the noise we add is probably doing better in predicting Y2 than Y1 itself (I haven't checked this though, but I find it likely to be the case)!
